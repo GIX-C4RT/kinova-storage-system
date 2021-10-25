@@ -1,6 +1,10 @@
 # kinova-storage-system
 Storgage system utilizing Kinova Gen3 and Gen3 lite robotic arms.
 
+# Dependencies
+1. OpenCV with GStreamer support
+2. Kinova Kortex API
+
 ## IP Addresses
 ### Gen3
 Arm 2: 10.155.234.34
