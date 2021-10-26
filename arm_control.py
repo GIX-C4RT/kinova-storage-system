@@ -1,3 +1,4 @@
+from operator import pos
 import utilities
 
 import time
@@ -205,6 +206,27 @@ def example_cartesian_trajectory_movement(base, base_cyclic):
     else:
         print("Timeout on action notification wait")
     return finished
+
+def set_gripper_position(base, position):
+    # Create the GripperCommand we will send
+    gripper_command = Base_pb2.GripperCommand()
+    finger = gripper_command.gripper.finger.add()
+
+    gripper_command.mode = Base_pb2.GRIPPER_POSITION
+    finger.finger_identifier = 1
+    finger.value = position
+
+    tol = 0.01
+    base.SendGripperCommand(gripper_command)
+
+    while True:
+        gripper_measure = base.GetMeasuredGripperMovement(gripper_command)
+        if len (gripper_measure.finger):
+            print("Current position is : {0}".format(gripper_measure.finger[0].value))
+            if abs(gripper_measure.finger[0].value -position) < tol:
+                break
+        else: # Else, no finger present in answer, end loop
+            break
 
 
 if __name__ == "__main__":

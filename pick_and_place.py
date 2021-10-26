@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 from kortex_api.autogen.client_stubs.BaseClientRpc import BaseClient
 from kortex_api.autogen.client_stubs.BaseCyclicClientRpc import BaseCyclicClient
-from arm_control import cartesian_action_movement_absolute, move_to_home_position, twist_command, cartesian_action_movement_relative
+from arm_control import cartesian_action_movement_absolute, move_to_home_position, set_gripper_position, twist_command, cartesian_action_movement_relative
 
 import imutils
 
@@ -64,17 +64,18 @@ def get_marker_coordinates(frame, id):
             return np.array([cX, cY, angle])
     return None
 
-    
-
-def pick(connection, id):
-    '''pick up the box with the ArUco marker with the specified ID'''
+def go_to_marker(connection, id):
+    '''move the hand above the marker with the specified ID'''
     (cap, base, base_cyclic) = connection
 
-    trans_tol = 0.05 # translational tolerance (undefined units)
+    x_tol = 0.003 # x translation tolerance
+    y_tol = 0.01 # y translation tolerance
     ang_tol = 5 # angular tolerance (deg)
-    x_gain = .01 # x proportional gain
-    y_gain = 0.01 # y propotional gain
-    ang_gain = .1 # angular velocity proportional gain
+    x_gain = .04 # x proportional gain
+    y_gain = .04 # y propotional gain
+    ang_gain = .2 # angular velocity proportional gain
+
+    y_offset = 0.2
 
     goal_reached = False
 
@@ -88,8 +89,9 @@ def pick(connection, id):
         # move gripper above box
         if coords is not None:
             x, y, angle = coords
+            y = y + y_offset
             print(coords)
-            if (np.linalg.norm([x, y]) <= trans_tol) and (np.abs(angle) <= ang_tol):
+            if (abs(x) <= x_tol) and (abs(y) <= y_tol) and (np.abs(angle) <= ang_tol):
                 print("goal reached")
                 # stop the arm from moving
                 base.Stop()
@@ -100,7 +102,7 @@ def pick(connection, id):
             if angle > 45:
                 angle -= 90
             # angle = angle + 45
-            print(angle)
+            # print(angle)
             ang_vel_z = angle * ang_gain
             # ang_vel_z = 0
             print(vel_x, vel_y, ang_vel_z)
@@ -109,13 +111,27 @@ def pick(connection, id):
         cv2.imshow("frame", frame)
         if cv2.waitKey(20) & 0xFF == ord('q'):
             break
+    # close any open OpenCV windows
+    cv2.destroyAllWindows()
+
+    
+
+def pick(connection, id):
+    '''pick up the box with the ArUco marker with the specified ID'''
+    (cap, base, base_cyclic) = connection
+
+    go_to_marker(connection, id)
     
     # lower arm
     feedback = base_cyclic.RefreshFeedback()
     dz = -feedback.base.tool_pose_z + 0.05 # 10cm above 0 z
     cartesian_action_movement_relative(base, base_cyclic, (0,0,dz,0,0,0))
 
-    
+    # close gripper
+    set_gripper_position(base, 0.15)
+
+    # raise the arm
+    cartesian_action_movement_relative(base, base_cyclic, (0,0,-dz,0,0,0))
 
     # close any open OpenCV windows
     cv2.destroyAllWindows()
@@ -126,6 +142,17 @@ def pick(connection, id):
 def place(connection, id):
     '''places a box on the ArUco marker with the specified ID'''
     pass
+
+def setup(connection):
+    (cap, base, base_cyclic) = connection
+    # open the gripper
+    set_gripper_position(base, 0.0)
+
+    # go to good position
+    feedback = base_cyclic.RefreshFeedback()
+    # print(feedback.base)
+    starting_pose = (0.4, 0, 0.5, 180, 0, 90)
+    cartesian_action_movement_absolute(base, base_cyclic, starting_pose)
 
 if __name__ == "__main__":
     # Create connection to the device and get the router
@@ -139,13 +166,12 @@ if __name__ == "__main__":
         connection = (cap, base, base_cyclic)
 
         # do stuff
-        # go to good position
-        feedback = base_cyclic.RefreshFeedback()
-        print(feedback.base)
-        starting_pose = (0.4, 0, 0.5, 180, 0, 90)
-        cartesian_action_movement_absolute(base, base_cyclic, starting_pose)
+        setup(connection)
+
         # pick up box 0
         pick(connection, 0)
+
+        setup(connection)
 
 
         # clean up:
