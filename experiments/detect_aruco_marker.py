@@ -8,6 +8,7 @@ while(cap.isOpened()):
     ret, frame = cap.read()
     # detect ArUco markers
     (corners, ids, rejected) = cv2.aruco.detectMarkers(frame, arucoDict, parameters=arucoParams)
+    print(ids)
     # verify *at least* one ArUco marker was detected
     if len(corners) > 0:
         # flatten the ArUco IDs list

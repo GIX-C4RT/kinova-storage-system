@@ -15,7 +15,8 @@ while(vcap.isOpened()):
     ret, frame = vcap.read()
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     ret,thresh = cv2.threshold(gray,50,255,cv2.THRESH_BINARY)
-    contours,hierarchy = cv2.findContours(thresh, 1, 2)
+    contours,hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    print(contours)
     # cnt = contours[0]
     # rect = cv2.minAreaRect(cnt)
     # box = cv2.boxPoints(rect)
@@ -27,5 +28,5 @@ while(vcap.isOpened()):
     if cv2.waitKey(20) & 0xFF == ord('q'):
         break
 
-cap.release()
+vcap.release()
 cv2.destroyAllWindows()
