@@ -124,22 +124,20 @@ def example_angular_action_movement(base):
         print("Timeout on action notification wait")
     return finished
 
-def example_cartesian_action_movement(base, base_cyclic):
+def cartesian_action_movement_absolute(base, base_cyclic, pose):
     
     print("Starting Cartesian action movement ...")
     action = Base_pb2.Action()
-    action.name = "Example Cartesian action movement"
+    action.name = "Cartesian action movement"
     action.application_data = ""
 
-    feedback = base_cyclic.RefreshFeedback()
-
     cartesian_pose = action.reach_pose.target_pose
-    cartesian_pose.x = feedback.base.tool_pose_x          # (meters)
-    cartesian_pose.y = feedback.base.tool_pose_y - 0.1    # (meters)
-    cartesian_pose.z = feedback.base.tool_pose_z - 0.2    # (meters)
-    cartesian_pose.theta_x = feedback.base.tool_pose_theta_x # (degrees)
-    cartesian_pose.theta_y = feedback.base.tool_pose_theta_y # (degrees)
-    cartesian_pose.theta_z = feedback.base.tool_pose_theta_z # (degrees)
+    cartesian_pose.x = pose[0]         # (meters)
+    cartesian_pose.y = pose[1]    # (meters)
+    cartesian_pose.z = pose[2]    # (meters)
+    cartesian_pose.theta_x = pose[3] # (degrees)
+    cartesian_pose.theta_y = pose[4] # (degrees)
+    cartesian_pose.theta_z = pose[5] # (degrees)
 
     e = threading.Event()
     notification_handle = base.OnNotificationActionTopic(
@@ -160,37 +158,19 @@ def example_cartesian_action_movement(base, base_cyclic):
         print("Timeout on action notification wait")
     return finished
 
-def example_angular_trajectory_movement(base):
-    
-    constrained_joint_angles = Base_pb2.ConstrainedJointAngles()
+def cartesian_action_movement_relative(base, base_cyclic, delta):
 
-    actuator_count = base.GetActuatorCount()
+    feedback = base_cyclic.RefreshFeedback()
 
-    # Place arm straight up
-    for joint_id in range(actuator_count.count):
-        joint_angle = constrained_joint_angles.joint_angles.joint_angles.add()
-        joint_angle.joint_identifier = joint_id
-        joint_angle.value = 0
+    x = feedback.base.tool_pose_x + delta[0]         # (meters)
+    y = feedback.base.tool_pose_y + delta[1]    # (meters)
+    z = feedback.base.tool_pose_z + delta[2]    # (meters)
+    theta_x = feedback.base.tool_pose_theta_x + delta[3] # (degrees)
+    theta_y = feedback.base.tool_pose_theta_y + delta[4] # (degrees)
+    theta_z = feedback.base.tool_pose_theta_z + delta[5] # (degrees)
+    pose = (x, y, z, theta_x, theta_y, theta_z)
 
-    e = threading.Event()
-    notification_handle = base.OnNotificationActionTopic(
-        check_for_end_or_abort(e),
-        Base_pb2.NotificationOptions()
-    )
-
-    print("Reaching joint angles...")
-    base.PlayJointTrajectory(constrained_joint_angles)
-
-
-    print("Waiting for movement to finish ...")
-    finished = e.wait(TIMEOUT_DURATION)
-    base.Unsubscribe(notification_handle)
-
-    if finished:
-        print("Joint angles reached")
-    else:
-        print("Timeout on action notification wait")
-    return finished
+    cartesian_action_movement_absolute(base, base_cyclic, pose)
 
 
 def example_cartesian_trajectory_movement(base, base_cyclic):
