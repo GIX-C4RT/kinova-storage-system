@@ -1,11 +1,15 @@
-import utilities
+from time import time
+
 import cv2
 import numpy as np
+import imutils
+
 from kortex_api.autogen.client_stubs.BaseClientRpc import BaseClient
 from kortex_api.autogen.client_stubs.BaseCyclicClientRpc import BaseCyclicClient
 from arm_control import cartesian_action_movement_absolute, move_to_home_position, set_gripper_position, twist_command, cartesian_action_movement_relative
 
-import imutils
+import utilities
+from pid import PID
 
 IP_ADDRESS = "192.168.1.10"
 ARUCO_DICT = cv2.aruco.DICT_ARUCO_ORIGINAL
@@ -64,16 +68,23 @@ def get_marker_coordinates(frame, id):
             return np.array([cX, cY, angle])
     return None
 
+
 def go_to_marker(connection, id):
     '''move the hand above the marker with the specified ID'''
     (cap, base, base_cyclic) = connection
 
+    x_pid = PID(0.0, 0, 0)
+    x_pid.send(None)
+
+    y_pid = PID(0.0, 0, 0)
+    y_pid.send(None)
+
+    theta_pid = PID(0.2, 0, 0)
+    theta_pid.send(None)
+
     x_tol = 0.003 # x translation tolerance
     y_tol = 0.01 # y translation tolerance
-    ang_tol = 5 # angular tolerance (deg)
-    x_gain = .04 # x proportional gain
-    y_gain = .04 # y propotional gain
-    ang_gain = .2 # angular velocity proportional gain
+    theta_tol = 5 # angular tolerance (deg)
 
     y_offset = 0.2
 
@@ -86,27 +97,29 @@ def go_to_marker(connection, id):
         # detect ArUco markers
         coords = get_marker_coordinates(frame, id)
         
-        # move gripper above box
+        # check if the specified marker is detected
         if coords is not None:
-            x, y, angle = coords
+            x, y, theta = coords
+            print("got coords:", coords)
+            # move gripper above box
             y = y + y_offset
             print(coords)
-            if (abs(x) <= x_tol) and (abs(y) <= y_tol) and (np.abs(angle) <= ang_tol):
+            if (abs(x) <= x_tol) and (abs(y) <= y_tol) and (np.abs(theta) <= theta_tol):
                 print("goal reached")
                 # stop the arm from moving
                 base.Stop()
                 break
             # calculate appropriate velocities
-            vel_x = -x * x_gain
-            vel_y = -y * y_gain
-            if angle > 45:
-                angle -= 90
-            # angle = angle + 45
-            # print(angle)
-            ang_vel_z = angle * ang_gain
+            t = time()
+            vel_x = x_pid.send([t, x, 0])
+            vel_y = y_pid.send([t, y, 0])
+            # # turn towards the closest side
+            # if theta > 45:
+            #     theta -= 90
+            vel_theta = theta_pid.send([t, theta, 0])
             # ang_vel_z = 0
-            print(vel_x, vel_y, ang_vel_z)
-            twist_command(base, (vel_x, vel_y, 0, 0, 0, ang_vel_z))
+            print(vel_x, vel_y, vel_theta)
+            twist_command(base, (vel_x, vel_y, 0, 0, 0, vel_theta))
         # display frame
         cv2.imshow("frame", frame)
         if cv2.waitKey(20) & 0xFF == ord('q'):
@@ -114,7 +127,6 @@ def go_to_marker(connection, id):
     # close any open OpenCV windows
     cv2.destroyAllWindows()
 
-    
 
 def pick(connection, id):
     '''pick up the box with the ArUco marker with the specified ID'''
@@ -139,9 +151,11 @@ def pick(connection, id):
     # stop the arm from moving
     base.Stop()
 
+
 def place(connection, id):
     '''places a box on the ArUco marker with the specified ID'''
     pass
+
 
 def setup(connection):
     (cap, base, base_cyclic) = connection
@@ -153,6 +167,7 @@ def setup(connection):
     # print(feedback.base)
     starting_pose = (0.4, 0, 0.5, 180, 0, 90)
     cartesian_action_movement_absolute(base, base_cyclic, starting_pose)
+
 
 if __name__ == "__main__":
     # Create connection to the device and get the router
