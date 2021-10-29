@@ -20,8 +20,6 @@ aruco_params = cv2.aruco.DetectorParameters_create()
 args = utilities.parseConnectionArguments()
 # print(args.ip)
 
-
-
 def get_marker_coordinates(frame, id):
     '''return coordinates (center_x, center_y, angle) of the specifed ArUco marker'''
     width = frame.shape[1]
@@ -46,18 +44,18 @@ def get_marker_coordinates(frame, id):
             # display code
             # TODO: disable for performance
             # display bounding box
-            cv2.drawContours(frame, [c4.astype(int)], 0, (0, 0, 255), 5)
+            # cv2.drawContours(frame, [c4.astype(int)], 0, (0, 0, 255), 5)
             # center of box
-            cv2.circle(frame, (int(cX), int(cY)), 7, (255, 255, 255), -1)
+            # cv2.circle(frame, (int(cX), int(cY)), 7, (255, 255, 255), -1)
             # label box
-            cv2.putText(frame, str(id), (int(cX) - 20, int(cY) - 20),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+            # cv2.putText(frame, str(id), (int(cX) - 20, int(cY) - 20),
+            #     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
             # cv2.imshow("id", frame)
             # center of screen
-            cv2.circle(frame, center_frame, 7, (0, 255, 0), -1)
+            # cv2.circle(frame, center_frame, 7, (0, 255, 0), -1)
             # label box
-            cv2.putText(frame, "center_frame", center_frame,
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+            # cv2.putText(frame, "center_frame", center_frame,
+            #     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
 
             # normalize the coordinates
             # print(frame.shape)
@@ -72,14 +70,17 @@ def get_marker_coordinates(frame, id):
 def go_to_marker(connection, id):
     '''move the hand above the marker with the specified ID'''
     (cap, base, base_cyclic) = connection
-
-    x_pid = PID(0.0, 0, 0)
+    I = .01
+    # x_pid = PID(0.2, 0.01, 0.02)
+    x_pid = PID(0.2, 0.0, 0.0)
     x_pid.send(None)
 
-    y_pid = PID(0.0, 0, 0)
+    # y_pid = PID(0.1, 0.01, 0.01)
+    y_pid = PID(0.1, 0.0, 0.0)
     y_pid.send(None)
 
-    theta_pid = PID(0.2, 0, 0)
+    # theta_pid = PID(1.5, 0.05, 0.05)
+    theta_pid = PID(1.5, 0.0, 0.0)
     theta_pid.send(None)
 
     x_tol = 0.003 # x translation tolerance
@@ -100,11 +101,15 @@ def go_to_marker(connection, id):
         # check if the specified marker is detected
         if coords is not None:
             x, y, theta = coords
-            print("got coords:", coords)
+            # print("got coords:", coords)
             # move gripper above box
             y = y + y_offset
-            print(coords)
-            if (abs(x) <= x_tol) and (abs(y) <= y_tol) and (np.abs(theta) <= theta_tol):
+            # print(coords)
+            x_reached = (abs(x) <= x_tol)
+            y_reached = (abs(y) <= y_tol)
+            theta_reached = (np.abs(theta) <= theta_tol)
+            print(x_reached, y_reached, theta_reached)
+            if x_reached and y_reached and theta_reached:
                 print("goal reached")
                 # stop the arm from moving
                 base.Stop()
@@ -114,16 +119,20 @@ def go_to_marker(connection, id):
             vel_x = x_pid.send([t, x, 0])
             vel_y = y_pid.send([t, y, 0])
             # # turn towards the closest side
-            # if theta > 45:
-            #     theta -= 90
-            vel_theta = theta_pid.send([t, theta, 0])
+            if theta > 45:
+                theta -= 90
+            vel_theta = -theta_pid.send([t, theta, 0])
             # ang_vel_z = 0
             print(vel_x, vel_y, vel_theta)
             twist_command(base, (vel_x, vel_y, 0, 0, 0, vel_theta))
+        else:
+            # no marker detected
+            # stop moving
+            twist_command(base, (0, 0, 0, 0, 0, 0))
         # display frame
-        cv2.imshow("frame", frame)
-        if cv2.waitKey(20) & 0xFF == ord('q'):
-            break
+        # cv2.imshow("frame", frame)
+        # if cv2.waitKey(20) & 0xFF == ord('q'):
+        #     break
     # close any open OpenCV windows
     cv2.destroyAllWindows()
 
@@ -172,6 +181,7 @@ def setup(connection):
 if __name__ == "__main__":
     # Create connection to the device and get the router
     with utilities.DeviceConnection.createTcpConnection(args) as router:
+        print(router)
         # Create required services
         base = BaseClient(router)
         base_cyclic = BaseCyclicClient(router)

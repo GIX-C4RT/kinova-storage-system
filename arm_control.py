@@ -86,7 +86,7 @@ def twist_command(base, velocities=(0,0,0,0,0,0)):
     twist.linear_x, twist.linear_y, twist.linear_z, \
         twist.angular_x, twist.angular_y, twist.angular_z = velocities
 
-    print ("Sending the twist command")
+    # print ("Sending the twist command")
     base.SendTwistCommand(command)
 
     return True
