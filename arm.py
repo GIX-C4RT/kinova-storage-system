@@ -28,8 +28,7 @@ class Arm():
         self.username = username
         self.password = password
 
-    def __enter__(self):
-        '''Connect to arm and open video stream.'''
+        # Connect to arm and open video stream.
         self.device_connection = utilities.DeviceConnection.createTcpConnection(self)
         self.router = self.device_connection.__enter__()
         # Create required services
@@ -39,7 +38,7 @@ class Arm():
         self.cap = cv2.VideoCapture("rtsp://" + self.ip + "/color")
 
     
-    def __exit__(self, exc_type, exc_value, traceback):
+    def disconnect(self):
         '''Disconnect from arm and close video stream.'''
         self.device_connection.__exit__(None, None, None)
         self.cap.release()
@@ -60,6 +59,10 @@ class Arm():
         return check
 
 
+    def stop(self):
+        self.base.Stop()
+
+
     def home(self):
         '''Send the arm to its home position.'''
         # Make sure the arm is in Single Level Servoing mode
@@ -68,7 +71,7 @@ class Arm():
         self.base.SetServoingMode(base_servo_mode)
         
         # Move arm to ready position
-        print("Moving the arm to a safe position")
+        print("Moving the arm to its home position")
         action_type = Base_pb2.RequestedActionType()
         action_type.action_type = Base_pb2.REACH_JOINT_ANGLES
         action_list = self.base.ReadAllActions(action_type)
@@ -78,7 +81,7 @@ class Arm():
                 action_handle = action.handle
 
         if action_handle == None:
-            print("Can't reach safe position. Exiting")
+            print("Can't reach home position. Exiting.")
             sys.exit(0)
 
         e = threading.Event()
@@ -94,12 +97,12 @@ class Arm():
         self.base.Unsubscribe(notification_handle)
 
         if finished:
-            print("Safe position reached")
+            print("Home position reached.")
         else:
-            print("Timeout on action notification wait")
+            print("Timeout on action notification wait.")
         return finished
 
-    def twist_command(self, velocities=(0,0,0,0,0,0)):
+    def twist(self, velocities=(0,0,0,0,0,0)):
         '''execute twist command with specified velocities in m/s and rad/s'''
 
         command = Base_pb2.TwistCommand()
@@ -112,12 +115,12 @@ class Arm():
         twist.linear_x, twist.linear_y, twist.linear_z, \
             twist.angular_x, twist.angular_y, twist.angular_z = velocities
 
-        # print ("Sending the twist command")
+        print ("Sending the twist command")
         self.base.SendTwistCommand(command)
 
         return True
 
-    def example_angular_action_movement(self):
+    def angles(self, angles):
         
         print("Starting angular action movement ...")
         action = Base_pb2.Action()
@@ -126,11 +129,15 @@ class Arm():
 
         actuator_count = self.base.GetActuatorCount()
 
+        if (actuator_count.count != len(angles)):
+            print("Length of angles must match number of joints.")
+            return
+
         # Place arm straight up
         for joint_id in range(actuator_count.count):
             joint_angle = action.reach_joint_angles.joint_angles.joint_angles.add()
             joint_angle.joint_identifier = joint_id
-            joint_angle.value = 0
+            joint_angle.value = angles[joint_id]
 
         e = threading.Event()
         notification_handle = self.base.OnNotificationActionTopic(
@@ -151,7 +158,7 @@ class Arm():
             print("Timeout on action notification wait")
         return finished
 
-    def cartesian_action_movement_absolute(self, pose):
+    def pose(self, pose):
         
         print("Starting Cartesian action movement ...")
         action = Base_pb2.Action()
@@ -185,7 +192,7 @@ class Arm():
             print("Timeout on action notification wait")
         return finished
 
-    def cartesian_action_movement_relative(self, delta):
+    def move_relative(self, delta):
 
         feedback = self.base_cyclic.RefreshFeedback()
 
@@ -200,32 +207,32 @@ class Arm():
         self.cartesian_action_movement_absolute(pose)
 
 
-    def example_cartesian_trajectory_movement(self):
+    def pose_2(self, pose):
         
         constrained_pose = Base_pb2.ConstrainedPose()
 
         feedback = self.base_cyclic.RefreshFeedback()
 
         cartesian_pose = constrained_pose.target_pose
-        cartesian_pose.x = feedback.base.tool_pose_x          # (meters)
-        cartesian_pose.y = feedback.base.tool_pose_y - 0.1    # (meters)
-        cartesian_pose.z = feedback.base.tool_pose_z - 0.2    # (meters)
-        cartesian_pose.theta_x = feedback.base.tool_pose_theta_x # (degrees)
-        cartesian_pose.theta_y = feedback.base.tool_pose_theta_y # (degrees)
-        cartesian_pose.theta_z = feedback.base.tool_pose_theta_z # (degrees)
+        cartesian_pose.x = pose[0]          # (meters)
+        cartesian_pose.y = pose[1]          # (meters)
+        cartesian_pose.z = pose[2]          # (meters)
+        cartesian_pose.theta_x = pose[3]    # (degrees)
+        cartesian_pose.theta_y = pose[4]    # (degrees)
+        cartesian_pose.theta_z = pose[5]    # (degrees)
 
         e = threading.Event()
-        notification_handle = base.OnNotificationActionTopic(
+        notification_handle = self.base.OnNotificationActionTopic(
             self.check_for_end_or_abort(e),
             Base_pb2.NotificationOptions()
         )
 
         print("Reaching cartesian pose...")
-        base.PlayCartesianTrajectory(constrained_pose)
+        self.base.PlayCartesianTrajectory(constrained_pose)
 
         print("Waiting for movement to finish ...")
         finished = e.wait(TIMEOUT_DURATION)
-        base.Unsubscribe(notification_handle)
+        self.base.Unsubscribe(notification_handle)
 
         if finished:
             print("Angular movement completed")
@@ -233,7 +240,7 @@ class Arm():
             print("Timeout on action notification wait")
         return finished
 
-    def set_gripper_position(self, position):
+    def grip(self, position):
         # Create the GripperCommand we will send
         gripper_command = Base_pb2.GripperCommand()
         finger = gripper_command.gripper.finger.add()
@@ -248,7 +255,7 @@ class Arm():
         while True:
             gripper_measure = self.base.GetMeasuredGripperMovement(gripper_command)
             if len (gripper_measure.finger):
-                print("Current position is : {0}".format(gripper_measure.finger[0].value))
+                # print("Current position is : {0}".format(gripper_measure.finger[0].value))
                 if abs(gripper_measure.finger[0].value -position) < tol:
                     break
             else: # Else, no finger present in answer, end loop
@@ -256,6 +263,22 @@ class Arm():
 
 
 if __name__ == "__main__":
-    with Arm() as arm:
-        print("With arm")
-        arm.home()
+    # initialize arm
+    arm = Arm()
+    arm.home() # go to home position
+    arm.grip(0) # open gripper
+
+    # test functions
+
+    # spin end effector for 5 seconds
+    arm.twist((0, 0, 0, 0, 0, 10))
+    time.sleep(2)
+    arm.stop()
+
+    arm.grip(.5) # close gripper halfway
+
+    arm.angles((0, 0, 0, 0, 0, 0)) # point straight up
+
+    # terminate
+    arm.home()
+    arm.disconnect()
