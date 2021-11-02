@@ -3,7 +3,9 @@ import sys
 import os
 import threading
 
+
 import cv2
+
 
 from kortex_api.TCPTransport import TCPTransport
 from kortex_api.RouterClient import RouterClient
@@ -12,8 +14,15 @@ from kortex_api.SessionManager import SessionManager
 from kortex_api.autogen.client_stubs.BaseClientRpc import BaseClient
 from kortex_api.autogen.client_stubs.BaseCyclicClientRpc import BaseCyclicClient
 
-
 from kortex_api.autogen.messages import Session_pb2, Base_pb2, BaseCyclic_pb2
+
+
+# vision stuff
+# from kortex_api.autogen.client_stubs.VisionConfigClientRpc import VisionConfigClient
+# from kortex_api.autogen.client_stubs.DeviceManagerClientRpc import DeviceManagerClient
+
+# from kortex_api.autogen.messages import DeviceConfig_pb2, Session_pb2, DeviceManager_pb2, VisionConfig_pb2
+
 
 import utilities
 
@@ -34,6 +43,11 @@ class Arm():
         # Create required services
         self.base = BaseClient(self.router)
         self.base_cyclic = BaseCyclicClient(self.router)
+        # self.device_manager = DeviceManagerClient(self.router)
+        # self.vision_config = VisionConfigClient(self.router)
+        # set up camera
+        # self.vision_device_id = self.get_vision_device_id()
+        # self.set_color_camera_resolution(VisionConfig_pb2.RESOLUTION_320x240)
         # open video stream
         self.cap = cv2.VideoCapture("rtsp://" + self.ip + "/color")
 
@@ -57,6 +71,28 @@ class Arm():
             or notification.action_event == Base_pb2.ACTION_ABORT:
                 e.set()
         return check
+
+    # def set_color_camera_resolution(self, resolution):
+    #     pass
+
+
+    # def get_vision_device_id(self):
+    #     vision_device_id = 0
+        
+    #     # Getting all device routing information (from DeviceManagerClient service)
+    #     all_devices_info = self.device_manager.ReadAllDevices()
+
+    #     vision_handles = [ hd for hd in all_devices_info.device_handle if hd.device_type == DeviceConfig_pb2.VISION ]
+    #     if len(vision_handles) == 0:
+    #         print("Error: there is no vision device registered in the devices info")
+    #     elif len(vision_handles) > 1:
+    #         print("Error: there are more than one vision device registered in the devices info")
+    #     else:
+    #         handle = vision_handles[0]
+    #         vision_device_id = handle.device_identifier
+    #         print("Vision module found, device Id: {0}".format(vision_device_id))
+
+    #     return vision_device_id
 
 
     def stop(self):

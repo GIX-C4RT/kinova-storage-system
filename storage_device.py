@@ -17,15 +17,11 @@ class StorageDevice:
         # CAUTION: arm planning may fail if you attempt to reach
         # these poses from far away
         # (arm path might self intersect, causing abort or physical crash)
-        self.storage_pose = (0.4, 0, 0.5, 180, 0, 90)
-        self.tray_pose = (-0.4, 0, 0.5, 180, 0, -90)
+        # self.storage_pose = (0.4, 0, 0.5, 180, 0, 90)
+        # self.tray_pose = (-0.4, 0, 0.5, 180, 0, -90)
 
-        self.storage_angles = (0, 13.6, 304, 360, 250, 90)
-        self.tray_angles = (180, 13.6, 304, 360, 250, 90)
-        # move the arm to the starting position
-        self.arm.angles(self.storage_angles)
-        self.arm.grip(0)
-
+        self.storage_angles = (0, 0, 270, 0, 270, 90)
+        self.tray_angles = (180, 0, 270, 0, 270, 90)
     
     def disconnect(self):
         '''Disconnect storage device.'''
@@ -42,9 +38,9 @@ class StorageDevice:
 
         # get items
         for idx, item_id in enumerate(item_ids):
-            self.arm.pose(self.storage_pose) # move arm to storage location
+            self.arm.angles(self.storage_angles) # move arm to storage location
             self.pick(item_id) # pick up the specified item
-            self.arm.pose(self.tray_pose) # move the arm over the tray
+            self.arm.angles(self.tray_angles) # move the arm over the tray
             self.place(idx) # place the item in the tray
 
     def store(self, item_ids):
@@ -58,9 +54,9 @@ class StorageDevice:
 
         # get items
         for idx, item_id in enumerate(item_ids):
-            self.arm.pose(self.tray_pose) # move the arm over the tray
+            self.arm.angles(self.tray_angles) # move the arm over the tray
             self.pick(item_id) # pick up the specified item
-            self.arm.pose(self.storage_pose) # move arm to storage location
+            self.arm.angles(self.storage_angles) # move arm to storage location
             self.place(idx) # place the item in storage
 
     def pick(self, item_id, display_frames=False):
@@ -106,7 +102,7 @@ class StorageDevice:
 
     def go_to_marker(self, marker_id, aruco_dict=cv2.aruco.DICT_ARUCO_ORIGINAL, display_frames=False):
         '''move the hand above the marker with the specified ID'''
-        y_offset = 0.05
+        y_offset = -0.5
 
         # PID controllers
         I = .01
@@ -172,7 +168,7 @@ class StorageDevice:
             else:
                 # no marker detected
                 print("no marker detected")
-                # stop moving
+                # stop movingTrue
                 self.arm.twist((0, 0, 0, 0, 0, 0))
         # close any open OpenCV windows
         cv2.destroyAllWindows()
@@ -235,14 +231,17 @@ class StorageDevice:
 if __name__ == "__main__":
     # initialize device
     device =  StorageDevice()
+    # move the arm to the starting position
+    device.arm.angles(device.storage_angles)
+    device.arm.grip(0)
 
     # test device
-    print(device.arm.get_pose())
-    print(device.arm.get_angles())
+    # print(device.arm.get_pose())
+    # print(device.arm.get_angles())
 
-    device.arm.angles(device.tray_angles)
+    # device.arm.angles(device.tray_angles)
 
-    item_id = 0
+    # item_id = 0
     # while True:
     #     coords, frame = device.get_marker_coordinates(item_id, return_frame=True)
     #     # print(coords)
@@ -250,13 +249,18 @@ if __name__ == "__main__":
     #     if cv2.waitKey(20) & 0xFF == ord('q'):
     #         break
 
-    # device.go_to_marker(item_id, display_frames=False)
+    # device.go_to_marker(item_id, display_frames=True)
 
     # device.pick(item_id, display_frames=False)
 
-    placement_id = 0
+    # placement_id = 0
     # device.place(placement_id, display_frames=False)
 
+    device.get((0, 1)) # retrieve items 0 and 1 and put them in the tray
+
+    device.store((0, 1)) # pick items 0 and 1 and store them
+
     # disconnect from device
+    device.arm.angles(device.storage_angles)
     device.arm.grip(0)
     device.disconnect()
