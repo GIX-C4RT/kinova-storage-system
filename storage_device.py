@@ -14,8 +14,16 @@ class StorageDevice:
         # connect to the arm
         self.arm = Arm(ip_address, username, password)
 
+        # CAUTION: arm planning may fail if you attempt to reach
+        # these poses from far away
+        # (arm path might self intersect, causing abort or physical crash)
+        self.storage_pose = (0.4, 0, 0.5, 180, 0, 90)
+        self.tray_pose = (-0.4, 0, 0.5, 180, 0, -90)
+
+        self.storage_angles = (0, 13.6, 304, 360, 250, 90)
+        self.tray_angles = (180, 13.6, 304, 360, 250, 90)
         # move the arm to the starting position
-        self.arm.pose((0.4, 0, 0.5, 180, 0, 90))
+        self.arm.angles(self.storage_angles)
         self.arm.grip(0)
 
     
@@ -23,11 +31,37 @@ class StorageDevice:
         '''Disconnect storage device.'''
         self.arm.disconnect()
 
-    def get(item_id):
-        pass
+    def get(self, item_ids):
+        # input checking
+        if len(item_ids) < 1:
+            print("Must request at least one item.")
+            return
+        if len(item_ids) > 4:
+            print("Must request at most 4 items.")
+            return
 
-    def store(item_id):
-        pass
+        # get items
+        for idx, item_id in enumerate(item_ids):
+            self.arm.pose(self.storage_pose) # move arm to storage location
+            self.pick(item_id) # pick up the specified item
+            self.arm.pose(self.tray_pose) # move the arm over the tray
+            self.place(idx) # place the item in the tray
+
+    def store(self, item_ids):
+        # input checking
+        if len(item_ids) < 1:
+            print("Must store at least one item.")
+            return
+        if len(item_ids) > 4:
+            print("Must store at most 4 items.")
+            return
+
+        # get items
+        for idx, item_id in enumerate(item_ids):
+            self.arm.pose(self.tray_pose) # move the arm over the tray
+            self.pick(item_id) # pick up the specified item
+            self.arm.pose(self.storage_pose) # move arm to storage location
+            self.place(idx) # place the item in storage
 
     def pick(self, item_id, display_frames=False):
         '''Pick up the box with the ArUco marker with the specified ID.'''
@@ -198,14 +232,15 @@ class StorageDevice:
         return coords
 
 
-
-
 if __name__ == "__main__":
     # initialize device
     device =  StorageDevice()
 
     # test device
     print(device.arm.get_pose())
+    print(device.arm.get_angles())
+
+    device.arm.angles(device.tray_angles)
 
     item_id = 0
     # while True:
@@ -217,10 +252,10 @@ if __name__ == "__main__":
 
     # device.go_to_marker(item_id, display_frames=False)
 
-    device.pick(item_id, display_frames=False)
+    # device.pick(item_id, display_frames=False)
 
     placement_id = 0
-    device.place(placement_id, display_frames=False)
+    # device.place(placement_id, display_frames=False)
 
     # disconnect from device
     device.arm.grip(0)

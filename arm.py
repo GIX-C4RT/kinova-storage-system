@@ -71,6 +71,19 @@ class Arm():
         return pose
 
 
+    def get_angles(self):
+        feedback = self.base_cyclic.RefreshFeedback()
+        angles = []
+        for actuator in feedback.actuators:
+            # print(actuator.position)
+            angles.append(actuator.position)
+        return tuple(angles)
+
+
+    def get_feedback(self):
+        return self.base_cyclic.RefreshFeedback()
+
+
     def home(self):
         '''Send the arm to its home position.'''
         # Make sure the arm is in Single Level Servoing mode
@@ -277,6 +290,9 @@ if __name__ == "__main__":
     arm.grip(0) # open gripper
 
     # test functions
+
+    print(arm.get_pose())
+    print(arm.get_angles())
 
     # spin end effector for 5 seconds
     arm.twist((0, 0, 0, 0, 0, 10))
