@@ -1,3 +1,4 @@
+import os, sys
 from time import time
 
 import cv2
@@ -8,6 +9,9 @@ from kortex_api.autogen.client_stubs.BaseClientRpc import BaseClient
 from kortex_api.autogen.client_stubs.BaseCyclicClientRpc import BaseCyclicClient
 from arm_control import cartesian_action_movement_absolute, move_to_home_position, set_gripper_position, twist_command, cartesian_action_movement_relative
 
+# so we can import from the parent directory
+sys.path.insert(1, os.path.join(sys.path[0], '..'))
+# now we can import the module in the parent directory
 import utilities
 from pid import PID
 

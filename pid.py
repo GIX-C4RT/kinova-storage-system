@@ -46,7 +46,7 @@ def PID(Kp, Ki, Kd, MV_bar=0):
         
         P = Kp*e
         I = I + Ki*e*(t - t_prev)
-        print(I)
+        # print(I)
         D = Kd*(e - e_prev)/(t - t_prev)
         
         MV = MV_bar + P + I + D

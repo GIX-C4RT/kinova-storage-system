@@ -1,7 +1,3 @@
-from operator import pos
-import utilities
-
-import time
 import sys
 import os
 import threading
@@ -15,6 +11,9 @@ from kortex_api.autogen.client_stubs.BaseCyclicClientRpc import BaseCyclicClient
 
 
 from kortex_api.autogen.messages import Session_pb2, Base_pb2, BaseCyclic_pb2
+
+sys.path.insert(1, os.path.join(sys.path[0], '..'))
+import utilities
 
 # Maximum allowed waiting time during actions (in seconds)
 TIMEOUT_DURATION = 20

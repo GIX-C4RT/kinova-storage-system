@@ -62,6 +62,14 @@ class Arm():
     def stop(self):
         self.base.Stop()
 
+    def get_pose(self):
+        feedback = self.base_cyclic.RefreshFeedback()
+        # print(feedback)
+        pose = (feedback.base.tool_pose_x, feedback.base.tool_pose_y,
+            feedback.base.tool_pose_z, feedback.base.tool_pose_theta_x,
+            feedback.base.tool_pose_theta_y, feedback.base.tool_pose_theta_z)
+        return pose
+
 
     def home(self):
         '''Send the arm to its home position.'''
@@ -115,7 +123,7 @@ class Arm():
         twist.linear_x, twist.linear_y, twist.linear_z, \
             twist.angular_x, twist.angular_y, twist.angular_z = velocities
 
-        print ("Sending the twist command")
+        print("Sending the twist command")
         self.base.SendTwistCommand(command)
 
         return True
@@ -204,7 +212,7 @@ class Arm():
         theta_z = feedback.base.tool_pose_theta_z + delta[5] # (degrees)
         pose = (x, y, z, theta_x, theta_y, theta_z)
 
-        self.cartesian_action_movement_absolute(pose)
+        self.pose(pose)
 
 
     def pose_2(self, pose):
