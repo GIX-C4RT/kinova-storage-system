@@ -25,7 +25,7 @@ source .venv/bin/activate # activate the virutual environment
 # install the kinova kortex python api
 python3 -m pip install ~/Downloads/kortex_api-2.3.0.post34-py3-none-any.whl
 # install OpenCV with ArUco support
-python3 -m pip install opencv-python-contrib
+python3 -m pip install opencv-contrib-python
 ```
 
 ### Run
