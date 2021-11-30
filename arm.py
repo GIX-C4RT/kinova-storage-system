@@ -172,7 +172,7 @@ class Arm():
         twist.linear_x, twist.linear_y, twist.linear_z, \
             twist.angular_x, twist.angular_y, twist.angular_z = velocities
 
-        print("Sending the twist command")
+        # print("Sending the twist command")
         self.base.SendTwistCommand(command)
 
         return True

@@ -8,6 +8,25 @@ from numpy.lib.function_base import disp
 from pid import PID
 from arm import Arm
 
+DEBUG = False
+
+# arm positions
+STORAGE_ANGLES = (0, 0, 270, 0, 270, 90)
+TRAY_ANGLES = (45, 0, 270, 0, 270, 90)
+
+# PID controllers
+# X_PID = PID(0.2, 0.01, 0.02)
+# X_PID = PID(0.2, 0.0, 0.0)
+X_PID = PID(0.1, 0.0, 0.0)
+
+# Y_PID = PID(0.1, 0.01, 0.01)
+Y_PID = PID(0.05, 0.0, 0.0)
+
+# THETA_PID = PID(1.5, 0.05, 0.05)
+# THETA_PID = PID(1.5, 0.0, 0.0)
+THETA_PID = PID(0.75, 0.0, 0.0)
+
+
 class StorageDevice:
     def __init__(self, ip_address="192.168.1.10", username="admin", password="admin"):
         '''Initialize the storage device.'''
@@ -20,8 +39,14 @@ class StorageDevice:
         # self.storage_pose = (0.4, 0, 0.5, 180, 0, 90)
         # self.tray_pose = (-0.4, 0, 0.5, 180, 0, -90)
 
-        self.storage_angles = (0, 0, 270, 0, 270, 90)
-        self.tray_angles = (180, 0, 270, 0, 270, 90)
+        self.storage_angles = STORAGE_ANGLES
+        self.tray_angles = TRAY_ANGLES
+
+        # Initialize PID controllers
+        
+        X_PID.send(None)
+        Y_PID.send(None)
+        THETA_PID.send(None)
     
     def disconnect(self):
         '''Disconnect storage device.'''
@@ -57,16 +82,16 @@ class StorageDevice:
             self.arm.angles(self.tray_angles) # move the arm over the tray
             self.pick(item_id) # pick up the specified item
             self.arm.angles(self.storage_angles) # move arm to storage location
-            self.place(idx) # place the item in storage
+            self.place(idx, aruco_dict=cv2.aruco.DICT_4X4_50) # place the item in storage
 
     def pick(self, item_id, display_frames=False):
         '''Pick up the box with the ArUco marker with the specified ID.'''
 
-        self.go_to_marker(item_id, display_frames=display_frames)
+        self.go_to_marker(item_id, y_offset=-0.5, display_frames=display_frames)
         
         # lower arm
         pose = self.arm.get_pose()
-        dz = -pose[2] + 0.05 # 5cm above 0 z
+        dz = -pose[2] + 0.06 # 6cm above 0 z
         self.arm.move_relative((0,0,dz,0,0,0))
 
         # close gripper
@@ -79,16 +104,16 @@ class StorageDevice:
         self.arm.stop()
 
 
-    def place(self, marker_id, display_frames=False):
+    def place(self, marker_id, aruco_dict=cv2.aruco.DICT_5X5_50, display_frames=False):
         '''Place the box on the ArUco marker with the specified marker_id.'''
         '''pick up the box with the ArUco marker with the specified ID'''
 
-        self.go_to_marker(marker_id, aruco_dict=cv2.aruco.DICT_5X5_50,
+        self.go_to_marker(marker_id, y_offset=-0.45, aruco_dict=aruco_dict,
             display_frames=display_frames)
         
         # lower arm
         pose = self.arm.get_pose()
-        dz = -pose[2] + 0.06 # 6cm above 0 z
+        dz = -pose[2] + 0.065 # 6.5cm above 0 z
         self.arm.move_relative((0,0,dz,0,0,0))
 
         # open gripper
@@ -100,23 +125,8 @@ class StorageDevice:
         # stop the arm from moving
         self.arm.stop()
 
-    def go_to_marker(self, marker_id, aruco_dict=cv2.aruco.DICT_ARUCO_ORIGINAL, display_frames=False):
+    def go_to_marker(self, marker_id, y_offset=0, aruco_dict=cv2.aruco.DICT_ARUCO_ORIGINAL, display_frames=False):
         '''move the hand above the marker with the specified ID'''
-        y_offset = -0.5
-
-        # PID controllers
-        I = .01
-        # x_pid = PID(0.2, 0.01, 0.02)
-        x_pid = PID(0.2, 0.0, 0.0)
-        x_pid.send(None)
-
-        # y_pid = PID(0.1, 0.01, 0.01)
-        y_pid = PID(0.1, 0.0, 0.0)
-        y_pid.send(None)
-
-        # theta_pid = PID(1.5, 0.05, 0.05)
-        theta_pid = PID(1.5, 0.0, 0.0)
-        theta_pid.send(None)
 
         x_tol = 0.003 # x translation tolerance
         y_tol = 0.01 # y translation tolerance
@@ -142,7 +152,7 @@ class StorageDevice:
             
             # check if the specified marker is detected
             if coords is not None:
-                print("marker detected")
+                print("marker detected") if DEBUG else None
                 x, y, theta = coords
                 # move gripper above box
                 y = y + y_offset
@@ -150,24 +160,24 @@ class StorageDevice:
                 y_reached = (abs(y) <= y_tol)
                 theta_reached = (np.abs(theta) <= theta_tol)
                 if x_reached and y_reached and theta_reached:
-                    print("goal reached")
+                    print("goal reached") if DEBUG else None
                     # stop the arm from moving
                     self.arm.stop()
                     break
                 # calculate appropriate velocities
                 t = time()
-                vel_x = x_pid.send([t, x, 0])
-                vel_y = y_pid.send([t, y, 0])
+                vel_x = X_PID.send([t, x, 0])
+                vel_y = Y_PID.send([t, y, 0])
                 # # turn towards the closest side
                 if theta > 45:
                     theta -= 90
-                vel_theta = -theta_pid.send([t, theta, 0])
+                vel_theta = -THETA_PID.send([t, theta, 0])
                 # ang_vel_z = 0
                 # print(vel_x, vel_y, vel_theta)
                 self.arm.twist((vel_x, vel_y, 0, 0, 0, vel_theta))
             else:
                 # no marker detected
-                print("no marker detected")
+                print("no marker detected") if DEBUG else None
                 # stop movingTrue
                 self.arm.twist((0, 0, 0, 0, 0, 0))
         # close any open OpenCV windows
@@ -178,7 +188,7 @@ class StorageDevice:
         coords = None
 
         _, frame = self.arm.cap.read()
-        frame = imutils.resize(frame, width=300)
+        # frame = imutils.resize(frame, width=300)
         
         width = frame.shape[1]
         height = frame.shape[0]
@@ -238,9 +248,7 @@ if __name__ == "__main__":
     # test device
     # print(device.arm.get_pose())
     # print(device.arm.get_angles())
-
     # device.arm.angles(device.tray_angles)
-
     # item_id = 0
     # while True:
     #     coords, frame = device.get_marker_coordinates(item_id, return_frame=True)
@@ -248,17 +256,25 @@ if __name__ == "__main__":
     #     cv2.imshow("Frame", frame)
     #     if cv2.waitKey(20) & 0xFF == ord('q'):
     #         break
-
     # device.go_to_marker(item_id, display_frames=True)
-
     # device.pick(item_id, display_frames=False)
-
-    # placement_id = 0
+    # device.arm.angles(device.storage_angles)
+    # placement_id = 1
     # device.place(placement_id, display_frames=False)
 
+    # pick items from storage and place them in the tray
+    start_get = time()
     device.get((0, 1)) # retrieve items 0 and 1 and put them in the tray
+    end_get = time()
+    get_time_interval = end_get - start_get
+    print(f"Get time: {get_time_interval}")
 
+    # pick items from the tray and place them in storage
+    start_store = time()
     device.store((0, 1)) # pick items 0 and 1 and store them
+    end_store = time()
+    store_time_interval = end_store - start_store
+    print(f"Store time: {store_time_interval}")
 
     # disconnect from device
     device.arm.angles(device.storage_angles)
